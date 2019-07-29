@@ -8,7 +8,7 @@ import bs4
 import re
 
 headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14.8; rv:45.0) Gecko/20100101 Firefox/46.0'
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 13.8; rv:45.0) Gecko/20100101 Firefox/45.0'
       }
 
 
@@ -18,33 +18,35 @@ class Model:
         self.model = None
 
     def fit(self, filename: str='text', is_dumped: bool=False,
-            should_dump: bool=False):
+            should_dump: bool=False, ngrams: int=2):
         #  filename следует писать без разрешения файла. если из файла нужно
         #  взять текст, подразумевается расширение .txt
         #  если нужно выгрузить или загрузить файлы pickle, расширение .pickle
         if not is_dumped:
-            with open(filename + '.txt', 'r') as file:
+            with open('text' + '.txt', 'r') as file:
                 data = file.read()
             dictionary = {}
             txt = re.findall('[А-Яа-яЁё]+[?!.]?', data)
-            prev = ''
-            prev1, prev2 = txt[0], txt[1]  # TODO: bigrams
-            for word in txt:
-                word = word.lower()
+            prev = tuple([txt[i] for i in range(ngrams)])
+            i = ngrams
+            while i < len(txt) - ngrams:
+                word = txt[i].lower()
                 end = False
                 if word[-1] in '.!,?':
-                    end = True
-                    if word[-1] == ',':
-                        word = word[:-1]
-                    else:
-                        word = word[:-1]# + '.'
+                    if word[-1] != ',':
+                        end = True
+                    word = word[:-1]  # + '.'
                 if prev:
-                    dictionary[prev][word] = dictionary[prev].get(word, 0) + 1
-                dictionary[word] = dictionary.get(word, {})
+                    dictionary[tuple(prev)] = dictionary.get(tuple(prev), {})
+                    dictionary[tuple(prev)][word] = dictionary[tuple(prev)].get(word, 0) + 1
+                prev = [j for j in prev[1:]]
+                prev.append(word)
+                dictionary[tuple(prev)] = dictionary.get(tuple(prev), {})
                 if not end:
-                    prev = word
+                    i += 1
                 else:
-                    prev = ''
+                    prev = [txt[i + j] for j in range(1, ngrams + 1)]
+                    i += ngrams
             if should_dump:
                 with open(filename + '.pickle', 'wb') as dumped:
                     pickle.dump(dictionary, dumped)
@@ -83,7 +85,9 @@ class Model:
                     if count - c >= 0:
                         count -= c
                         sent.append(token)
-                        prev = token
+                        prev = [i for i in prev[1:]]
+                        prev.append(token)
+                        prev = tuple(prev)
                     else:
                         bad.add(token)
             nline += 1
@@ -98,11 +102,19 @@ class Model:
         #  функция вернет все накопившиеся до этого слова принудительно.
         ssent = self.generating_procedure()
         l2 = ssent[1][-1]
-        request = requests.get('https://rifme.net/r/{}/1#slogov'.format(l2), headers=headers).text
+        request = requests.get('https://rifmik.net/rhyme/{}'.format(l2), headers=headers).text
         dom = bs4.BeautifulSoup(request)
-        res = list(filter(lambda a: sum([1 if i in 'уеыаоэяиюё' else 0 for i in a]) == 2, map(lambda a: a.split('"')[1],
-                          re.findall('data-w="\w+"', str(dom.findAll('ul', {"class": 'rifmypodryad'})[0])))))
-        const = 0.75  # 0 < const ⩽ 1. Регулирует производную в распределении. Чем ближе к единице, тем меньше производная (слова становятся более равновероятными)
+        dom1 = list(dom.findAll('div', {'class': "result multicoll"}))
+        syll2 = list(dom.findAll('div', {'id': 'syll2'}))
+        dom1.extend(syll2)
+        if not dom1:
+            return self.generate()  # restart
+        res = tuple(set(filter(lambda a: sum([1 if i in 'уеыаоэяиюё' else 0 for i in a]) == 2 and a.isalpha(),
+                               map(lambda a: str(a)[30:-6].replace('<span class="accent">', '').replace('</span>', ''),
+                                   dom1))))
+        if len(res) == 0:
+            return self.generate()  # restart
+        const = 0.9  # 0 < const ⩽ 1. Регулирует производную в распределении. Чем ближе к единице, тем меньше производная (слова становятся более равновероятными)
         y1 = (const - 1) / (pow(const, len(res)) - 1)
         n = int(math.log(random.random() / y1, const)) + 1
         word_ = res[n if n < len(res) else 0]
