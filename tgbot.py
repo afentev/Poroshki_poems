@@ -21,11 +21,11 @@ russian_pairs = {'Существительное': 'сущ', 'Глагол': 'г
                  'Предикатив': 'предик'}
 
 apihelper.proxy = {
-  'http': 'socks5://xx:xx@4adbaf.fckrknbot.club:443',
-  'https': 'socks5://xx:xx@4adbaf.fckrknbot.club:443'
+  'http': 'socks5://user_271520585:e0rYeNgcZGqA@4adbaf.fckrknbot.club:443',
+  'https': 'socks5://user_271520585:e0rYeNgcZGqA@4adbaf.fckrknbot.club:443'
 }
 
-bot = telebot.TeleBot('xx:xx-xx-xx')
+bot = telebot.TeleBot('876557094:AAHTU7I54LlCcIZwGbixaLwJM-hV8fV0-8g')
 
 status = {}
 rate = {}
@@ -51,11 +51,10 @@ def start_message(message):
         kb.add(*[types.InlineKeyboardButton(text=name, callback_data=name) for name in [chr(128077), chr(128078)]])
         bot.send_message(sender, poem, reply_markup=kb)
     elif command == '/settings':
-        pass
+        bot.send_message(sender, 'Тут пока еще ничего нет :(')
     elif command == '/rules':
-        bot.send_message(sender,
-                         'Правила разметки описаны ниже:\n' + '\n'.join(tuple(map(lambda a: a[1] + ' - ' + a[0].lower(),
-                                                                                  russian_pairs.items()))))
+        bot.send_message(sender, 'Правила разметки описаны ниже:')
+        bot.send_message(sender, '\n'.join(tuple(map(lambda a: a[1] + ' - ' + a[0].lower(), russian_pairs.items()))))
 
 
 @bot.callback_query_handler(func=lambda a: True)
